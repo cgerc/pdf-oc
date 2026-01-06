@@ -1,35 +1,532 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" href="./assets/img/4geeks.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hello Rigo with Vanilla.js</title>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Generador de Orden de Compra - Hard Hat Solutions</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f4; }
+        .control-panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 400px; float: left; margin-right: 20px; }
+        .page { background: white; padding: 20px; border: 1px solid #ddd; max-width: 800px; margin-top: 20px; box-sizing: border-box; }
+       @media print {
+      .no-print {
+        display: none;
+      }
+      .page {
+        margin: 0;
+        border: none;
+        box-shadow: none;
+        padding: 0;
+      }
+    }
 
-    <!-- Fontawesome is our recomended library for icons -->
-    <link
-      rel="stylesheet"
-      href="https://use.fontawesome.com/releases/v5.2.0/css/all.css"
-      integrity="sha384-hWVjflwFxL6sNzntih27bfxkr27PmbbK/iSvJ+a4+0owXq79v+lsFkW54bOGbiDQ"
-      crossorigin="anonymous"
-    />
-  </head>
-  <body>
-    <!-- Write your HTML code here, you can delete everything withing the body tags -->
-    <div class="container-fluid text-center">
-      <h1 class="mt-5">Hello Rigo!</h1>
-      <img src="./assets/img/rigo-baby.jpg" />
-      <p class="alert alert-warning mt-4">
-        If this text is <b>not</b> centered and <b>yellow</b>, you probably have
-        an error
-      </p>
-      <div class="fixed-bottom p-4">
-        Made with ❤️ by
-        <a href="https://www.4geeksacademy.com">4Geeks Academy</a>
-      </div>
+        /* EVITA QUE EL PDF SE CORTE */
+        table, tr, .totals-section, .footer-notes, .notes, .signatures, .info-grid, .oc-box {
+            page-break-inside: avoid !important;
+        }
+        .page { page-break-after: always; }
+
+        /* Nueva sección para OCs guardadas */
+        .ocs-section { margin-top: 30px; background: #f9f9f9; padding: 15px; border-radius: 6px; }
+        .ocs-list { max-height: 200px; overflow-y: auto; }
+        .oc-item { padding: 8px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
+        .oc-item button { width: auto; margin-left: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="control-panel no-print">
+        <h2>Datos de la OC</h2>
+        <select id="inputObraSelect"><option value="">Selecciona la obra</option></select>
+        <select id="inputProveedor"><option value="" disabled selected>Selecciona Razón Social</option></select>
+        <input type="text" id="inputRutProv" placeholder="RUT Proveedor" readonly style="background:#f9f9f9;">
+        <input type="text" id="inputDireccion" placeholder="Dirección" readonly style="background:#f9f9f9;">
+        <input type="date" id="inputFecha" readonly>
+        <select id="inputCondicionPago"><option value="">Seleccione proveedor primero</option></select>
+
+        <h3>Notas al Proveedor</h3>
+        <div style="margin-top: 10px;">
+            <input type="text" id="nuevaNota" placeholder="Escriba nota y presione Enter o +Agregar" style="width: 70%;">
+            <button onclick="agregarNota()" style="width: 28%;">+ Agregar</button>
+        </div>
+        <div id="listaNotasEditables" style="margin-top: 12px; max-height: 150px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 6px; font-size: 14px;"></div>
+
+        <h3>Ítems</h3>
+        <div id="items-form">
+            <select id="newClase"><option value="" disabled selected>Clase</option></select>
+            <input type="text" id="newDesc" placeholder="Descripción">
+            <input type="number" id="newQty" placeholder="Cant." style="width: 70px;">
+            <input type="number" id="newPrice" placeholder="Precio Unit.">
+            <button onclick="agregarItem()">+ Agregar</button>
+        </div>
+
+        <!-- Nueva sección para editar número de OC -->
+        <h3>Configuración de Número de OC</h3>
+        <input type="number" id="editOcNumber" placeholder="Editar número actual de OC" style="width: 70%;">
+        <button onclick="actualizarNumeroManual()" style="width: 28%;">Actualizar</button>
+
+        <!-- Nueva sección para OCs guardadas -->
+        <div class="ocs-section">
+            <h3>Órdenes de Compra Guardadas</h3>
+            <div id="ocsList" class="ocs-list"></div>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <button class="btn-print" onclick="generarPDF()">Generar y Descargar PDF</button>
+            <p style="font-size:15px; color:#666; margin:15px 0 0 0;">
+                Próxima OC: <strong id="proximaOC">cargando...</strong>
+            </p>
+        </div>
     </div>
 
-    <!-- Do not delete this script tag, this is what connects your HTML with the Javascript code -->
-    <script type="module" src="/app.js"></script>
-  </body>
+    <div class="page">
+        <header>
+            <div class="logo-section" style="display:flex; align-items:center; justify-content:space-between;">
+                <img src="logo casi.jpg" alt="Hard Hat Logo" style="width: 120px;">
+                <div class="company-info" style="text-align:right;">
+                    <h3>HARD HAT SOLUTIONS SPA</h3>
+                    <p>Giro: ESTUDIO, GESTIÓN, ADMINISTRACIÓN DE OBRAS DE CONSTRUCCIÓN</p>
+                    <p>RUT: 78.293.581-K</p>
+                    <p>Dr. Manuel Barros Borgoño 71, Of 1105, Providencia</p>
+                    <p>Contacto: administracion@hhs.cl | +56 9 6254 3173</p>
+                </div>
+            </div>
+            <div class="oc-box" style="text-align:right; margin-top:20px;">
+                <h2>ORDEN DE COMPRA</h2>
+                <div class="oc-number">N° <span id="ocNum" style="font-size:24px; font-weight:bold;">000</span></div>
+                <p>Fecha: <span id="dispFecha"></span></p>
+            </div>
+        </header>
+
+        <section class="info-grid" style="display:flex; justify-content:space-between; margin:30px 0; font-size:15px;">
+            <div class="box">
+                <strong>Señor(es):</strong> <span id="dispProv"></span><br>
+                <strong>RUT:</strong> <span id="dispRut"></span><br>
+                <strong>Dirección:</strong> <span id="dispDir"></span>
+            </div>
+            <div class="box" style="text-align:right;">
+                <strong>Obra:</strong> <span id="dispObra">–</span><br>
+                <strong>Condición de Pago:</strong> <span id="dispCondicionPago">–</span><br>
+                <strong>Moneda:</strong> Peso Chileno
+            </div>
+        </section>
+
+        <table class="items-table" style="width:100%; border-collapse:collapse; margin:20px 0;">
+            <thead style="background:#0066cc; color:white;">
+                <tr>
+                    <th style="padding:10px; text-align:left; width:140px;">Clase</th>
+                    <th style="padding:10px; text-align:left;">Descripción</th>
+                    <th style="padding:10px;">Unid.</th>
+                    <th style="padding:10px;">Cant.</th>
+                    <th style="padding:10px;">Precio Unit.</th>
+                    <th style="padding:10px;">Total</th>
+                </tr>
+            </thead>
+            <tbody id="tablaCuerpo" style="font-size:14px;"></tbody>
+        </table>
+
+        <div class="totals-section" style="text-align:right; margin:30px 0;">
+            <div style="display:inline-block; background:#f8f8f8; padding:15px; border-radius:8px;">
+                <div style="margin:8px 0;"><span>Neto:</span> <strong><span id="totalNeto">$0</span></strong></div>
+                <div style="margin:8px 0;"><span>IVA (19%):</span> <strong><span id="totalIva">$0</span></strong></div>
+                <div style="margin:12px 0; font-size:18px; border-top:2px solid #000; padding-top:8px;">
+                    <span>TOTAL:</span> <strong><span id="totalFinal">$0</span></strong>
+                </div>
+            </div>
+        </div>
+
+        <footer class="footer-notes" style="margin-top:40px;">
+            <div class="notes">
+                <strong>Notas al Proveedor:</strong>
+                <div id="dispNotas" style="font-size: 10px; margin-top: 8px; line-height:1.4;">
+                    • Toda facturación deberá adjuntar esta O.C.<br>
+                    • No se aceptarán facturaciones con precios distintos a esta O.C.<br>
+                    <span id="notasExtra"></span>
+                </div>
+            </div>
+            <div class="signatures" style="text-align:right; margin-top:40px;">
+                <div style="display:inline-block;">
+                    <br><br><br>
+                    <hr style="border-top:1px solid #000;">
+                    <p style="margin:5px 0;"><strong>Jorge Chacon</strong></p>
+                    <p style="margin:0; color:#555;">Gerente General</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <script>
+        function formatearMoneda(n) {
+            return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(n);
+        }
+
+        // === NÚMERO DE OC INCREMENTAL ===
+        const KEY_OC = 'ultimaOC_HHS';
+        const KEY_OCS = 'ocs_HHS'; // Nueva clave para almacenar OCs
+        let numeroActual = parseInt(localStorage.getItem(KEY_OC) || '1');
+        let ocsGuardadas = JSON.parse(localStorage.getItem(KEY_OCS)) || [];
+
+        function actualizarNumeroOC() {
+            const padded = String(numeroActual).padStart(4, '0');
+            document.getElementById('ocNum').textContent = padded;
+            document.getElementById('proximaOC').textContent = String(numeroActual + 1).padStart(4, '0');
+        }
+
+        // Nueva función para actualizar número manualmente
+        function actualizarNumeroManual() {
+            const nuevoNumero = parseInt(document.getElementById('editOcNumber').value);
+            if (isNaN(nuevoNumero) || nuevoNumero < 1) {
+                alert('Ingrese un número válido mayor o igual a 1.');
+                return;
+            }
+            numeroActual = nuevoNumero;
+            localStorage.setItem(KEY_OC, numeroActual);
+            actualizarNumeroOC();
+            document.getElementById('editOcNumber').value = '';
+            alert('Número de OC actualizado correctamente.');
+        }
+
+        // Nueva función para guardar la OC actual
+        function guardarOC() {
+            const ocData = {
+                numero: document.getElementById('ocNum').textContent,
+                fecha: document.getElementById('dispFecha').textContent,
+                obra: document.getElementById('dispObra').textContent,
+                proveedor: document.getElementById('dispProv').textContent,
+                rut: document.getElementById('dispRut').textContent,
+                direccion: document.getElementById('dispDir').textContent,
+                condicionPago: document.getElementById('dispCondicionPago').textContent,
+                items: [...items], // Copia de los items
+                notas: [...notasExtra], // Copia de las notas
+                totalNeto: document.getElementById('totalNeto').textContent,
+                totalIva: document.getElementById('totalIva').textContent,
+                totalFinal: document.getElementById('totalFinal').textContent
+            };
+            ocsGuardadas.push(ocData);
+            localStorage.setItem(KEY_OCS, JSON.stringify(ocsGuardadas));
+            renderizarOCsGuardadas();
+        }
+
+        // Nueva función para renderizar lista de OCs guardadas
+        function renderizarOCsGuardadas() {
+            const listContainer = document.getElementById('ocsList');
+            listContainer.innerHTML = '';
+            if (ocsGuardadas.length === 0) {
+                listContainer.innerHTML = '<em style="color:#999;">No hay OCs guardadas.</em>';
+                return;
+            }
+            ocsGuardadas.forEach((oc, index) => {
+                const div = document.createElement('div');
+                div.className = 'oc-item';
+                div.innerHTML = `
+                    <span>OC N°${oc.numero} - ${oc.obra} (${oc.fecha})</span>
+                    <div>
+                        <button onclick="cargarOC(${index})">Cargar</button>
+                        <button onclick="borrarOC(${index})">Borrar</button>
+                    </div>
+                `;
+                listContainer.appendChild(div);
+            });
+        }
+
+        // Nueva función para cargar una OC guardada (para edición)
+        function cargarOC(index) {
+            if (!confirm('¿Cargar esta OC? Se sobrescribirán los datos actuales.')) return;
+            const oc = ocsGuardadas[index];
+
+            // Cargar datos básicos
+            document.getElementById('inputObraSelect').value = oc.obra;
+            document.getElementById('dispObra').textContent = oc.obra;
+            document.getElementById('inputProveedor').value = ''; // Necesita mapear de vuelta, pero como proveedor es por clase, asumir búsqueda
+            document.getElementById('dispProv').textContent = oc.proveedor;
+            document.getElementById('inputRutProv').value = oc.rut;
+            document.getElementById('dispRut').textContent = oc.rut;
+            document.getElementById('inputDireccion').value = oc.direccion;
+            document.getElementById('dispDir').textContent = oc.direccion;
+            document.getElementById('inputCondicionPago').value = oc.condicionPago;
+            document.getElementById('dispCondicionPago').textContent = oc.condicionPago;
+
+            // Cargar fecha (asumir actual, o setear si guardada)
+            // Nota: fecha es readonly, pero para edición, quizás permitir cambio
+
+            // Cargar items
+            items = [...oc.items];
+            renderizarTabla();
+
+            // Cargar notas
+            notasExtra = [...oc.notas];
+            renderizarNotas();
+
+            // Opcional: No cambiar número de OC, ya que es para editar una nueva basada en esta
+            alert('OC cargada para edición. Puedes modificar y generar una nueva.');
+        }
+
+        // Nueva función para borrar OC guardada
+        function borrarOC(index) {
+            if (!confirm('¿Borrar esta OC guardada?')) return;
+            ocsGuardadas.splice(index, 1);
+            localStorage.setItem(KEY_OCS, JSON.stringify(ocsGuardadas));
+            renderizarOCsGuardadas();
+        }
+
+        function generarPDF() {
+      const obra = document.getElementById('dispObra').textContent.trim() || 'Sin Obra';
+      const numeroOC = document.getElementById('ocNum').textContent;
+      const nombreArchivo = `${obra} , OC N°${numeroOC}.pdf`;
+      const element = document.querySelector('.page');
+      const borderOriginal = element.style.border;
+      const shadowOriginal = element.style.boxShadow;
+      element.style.border = 'none';
+      element.style.boxShadow = 'none';
+      const opt = {
+        // 1. Márgenes pequeños para aprovechar la hoja (0.2 pulgadas)
+        margin: 0.2,
+        filename: nombreArchivo,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 2, // Usamos 2 para mejor calidad de texto
+          useCORS: true,
+          letterRendering: true,
+          scrollY: 0 // Asegura que se imprima desde arriba aunque hayas hecho scroll
+        },
+        jsPDF: {
+          unit: 'in',
+          format: 'letter', // USAMOS TAMAÑO CARTA ESTÁNDAR
+          orientation: 'portrait'
+        },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      };
+      // Generar el PDF
+      html2pdf().set(opt).from(element).save().then(() => {
+        // Solo incrementamos el número si se guardó con éxito
+        numeroActual++;
+        localStorage.setItem(KEY_OC, numeroActual);
+        actualizarNumeroOC();
+      });
+    }
+
+        // Inicializar número y OCs
+        actualizarNumeroOC();
+        renderizarOCsGuardadas();
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('inputFecha').valueAsDate = new Date();
+            document.getElementById('dispFecha').innerText = new Date().toLocaleDateString('es-CL');
+
+            // CARGAR PROVEEDORES - VERSIÓN QUE SÍ FUNCIONA CON TUS 38 FILAS
+            fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vSQ0W7Yhu123yENGAHaV5Ok-yX5DkPO_7orj9rydaVbI_f4DDQN41MPc7nuGSIkaO_-vBeRnM2rF9SR/pub?output=csv')
+                .then(response => response.text())
+                .then(csv => {
+                    const rows = csv.split('\n').map(row => row.trim()).filter(row => row);
+                    const data = {};
+
+                    // Saltamos la cabecera
+                    for (let i = 1; i < rows.length; i++) {
+                        let row = rows[i];
+                        let fields = [];
+                        let field = '';
+                        let inQuotes = false;
+
+                        // Parseo manual carácter por carácter
+                        for (let char of row + ',') {
+                            if (char === '"') {
+                                inQuotes = !inQuotes;
+                            } else if (char === ',' && !inQuotes) {
+                                fields.push(field.trim());
+                                field = '';
+                            } else {
+                                field += char;
+                            }
+                        }
+
+                        // Limpiar comillas
+                        fields = fields.map(f => f.replace(/^"|"$/g, '').trim());
+
+                        const clase = fields[0] || '';
+                        const razon = fields[1] || '';
+                        const condicionPago = fields[2] || 'Contado';
+                        const rut = fields[3] || '';
+                        const dir = fields[4] || '';
+
+                        if (clase && razon) {
+                            data[clase] = { razon, condicionPago, rut, dir };
+                        }
+                    }
+
+                    console.log('Proveedores cargados:', Object.keys(data).length); // <-- Esto te dirá cuántas cargó
+
+                    // Dropdown Razón Social
+                    const selProv = document.getElementById('inputProveedor');
+                    selProv.innerHTML = '<option value="">Selecciona Razón Social...</option>';
+                    Object.keys(data).sort().forEach(clase => {
+                        const opt = document.createElement('option');
+                        opt.value = clase;
+                        opt.textContent = data[clase].razon;
+                        selProv.appendChild(opt);
+                    });
+
+                    // Dropdown Clase para ítems
+                    const selClase = document.getElementById('newClase');
+                    selClase.innerHTML = '<option value="">Clase</option>';
+                    Object.keys(data).sort().forEach(clase => {
+                        const opt = document.createElement('option');
+                        opt.value = clase;
+                        opt.textContent = clase;
+                        selClase.appendChild(opt);
+                    });
+
+                    // Cuando cambias proveedor
+                    selProv.onchange = () => {
+                        const p = data[selProv.value];
+                        if (!p) return;
+                        document.getElementById('dispProv').textContent = p.razon;
+                        document.getElementById('inputRutProv').value = p.rut;
+                        document.getElementById('inputDireccion').value = p.dir;
+                        document.getElementById('dispRut').textContent = p.rut;
+                        document.getElementById('dispDir').textContent = p.dir;
+
+                        const condicionSelect = document.getElementById('inputCondicionPago');
+                        condicionSelect.innerHTML = `<option value="Contado">Contado</option><option value="Crédito">Crédito</option>`;
+                        condicionSelect.value = p.condicionPago || 'Contado';
+                        document.getElementById('dispCondicionPago').textContent = p.condicionPago || 'Contado';
+
+                        condicionSelect.onchange = () => {
+                            document.getElementById('dispCondicionPago').textContent = condicionSelect.value;
+                        };
+                    };
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('No se pudieron cargar los proveedores');
+                });
+
+            // CARGAR OBRAS
+            fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vSQ0W7Yhu123yENGAHaV5Ok-yX5DkPO_7orj9rydaVbI_f4DDQN41MPc7nuGSIkaO_-vBeRnM2rF9SR/pub?gid=1397970288&single=true&output=csv')
+                .then(r => r.text())
+                .then(csv => {
+                    const lineas = csv.split('\n').map(l => l.trim()).filter(l => l);
+                    const selObra = document.getElementById('inputObraSelect');
+                    selObra.innerHTML = '<option value="">Selecciona la obra...</option>';
+                    for (let i = 1; i < lineas.length; i++) {
+                        const nombre = lineas[i].split(',')[0].replace(/^"|"$/g, '').trim();
+                        if (nombre && nombre !== "Obras") {
+                            const opt = document.createElement('option');
+                            opt.value = nombre;
+                            opt.textContent = nombre;
+                            selObra.appendChild(opt);
+                        }
+                    }
+                    selObra.onchange = () => {
+                        document.getElementById('dispObra').textContent = selObra.value || '–';
+                    };
+                })
+                .catch(err => console.error('Error cargando obras:', err));
+        });
+
+        // === ÍTEMS ===
+        let items = [];
+        function agregarItem() {
+            const clase = document.getElementById('newClase').value;
+            const desc = document.getElementById('newDesc').value.trim();
+            const cant = parseFloat(document.getElementById('newQty').value) || 0;
+            const precio = parseFloat(document.getElementById('newPrice').value) || 0;
+            if (!clase || !desc) return alert("Faltan clase o descripción");
+            items.push({ clase, desc, cant, precio, total: cant * precio });
+            renderizarTabla();
+            document.getElementById('newDesc').value = "";
+            document.getElementById('newQty').value = "";
+            document.getElementById('newPrice').value = "";
+        }
+
+        function renderizarTabla() {
+            const tbody = document.getElementById('tablaCuerpo');
+            tbody.innerHTML = "";
+            let neto = 0;
+            items.forEach(i => {
+                neto += i.total;
+                tbody.innerHTML += `<tr>
+                    <td style="padding:8px; border-bottom:1px solid #ddd;">${i.clase}</td>
+                    <td style="padding:8px; border-bottom:1px solid #ddd;">${i.desc}</td>
+                    <td style="padding:8px; border-bottom:1px solid #ddd; text-align:center;">UN</td>
+                    <td style="padding:8px; border-bottom:1px solid #ddd; text-align:center;">${i.cant}</td>
+                    <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">${formatearMoneda(i.precio)}</td>
+                    <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">${formatearMoneda(i.total)}</td>
+                </tr>`;
+            });
+            const iva = neto * 0.19;
+            document.getElementById('totalNeto').textContent = formatearMoneda(neto);
+            document.getElementById('totalIva').textContent = formatearMoneda(iva);
+            document.getElementById('totalFinal').textContent = formatearMoneda(neto + iva);
+        }
+
+        // === NOTAS AL PROVEEDOR - EDITABLES ===
+        let notasExtra = [];
+
+        function renderizarNotas() {
+            const contenedor = document.getElementById('listaNotasEditables');
+            const contenedorOC = document.getElementById('notasExtra');
+
+            if (notasExtra.length === 0) {
+                contenedor.innerHTML = '<em style="color:#999;">Sin notas adicionales</em>';
+                contenedorOC.innerHTML = '';
+                return;
+            }
+
+            contenedor.innerHTML = '';
+            notasExtra.forEach((nota, index) => {
+                const div = document.createElement('div');
+                div.style.cssText = 'margin:6px 0; padding:8px; background:white; border-radius:4px; display:flex; justify-content:space-between; align-items:center; font-size:13px;';
+                div.innerHTML = `
+                    <span>${nota}</span>
+                    <div>
+                        <button onclick="editarNota(${index})">Editar</button>
+                        <button onclick="borrarNota(${index})">Borrar</button>
+                    </div>
+                `;
+                contenedor.appendChild(div);
+            });
+
+            contenedorOC.innerHTML = notasExtra.join('<br>');
+        }
+
+        function agregarNota() {
+            const input = document.getElementById('nuevaNota');
+            const texto = input.value.trim();
+            if (!texto) return;
+            notasExtra.push("• " + texto);
+            input.value = "";
+            renderizarNotas();
+        }
+
+        function editarNota(index) {
+            const nuevoTexto = prompt("Editar nota:", notasExtra[index].substring(2));
+            if (nuevoTexto === null) return;
+            if (nuevoTexto.trim() === "") {
+                borrarNota(index);
+            } else {
+                notasExtra[index] = "• " + nuevoTexto.trim();
+                renderizarNotas();
+            }
+        }
+
+        function borrarNota(index) {
+            if (confirm("¿Borrar esta nota?")) {
+                notasExtra.splice(index, 1);
+                renderizarNotas();
+            }
+        }
+
+        document.getElementById('nuevaNota').addEventListener('keypress', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                agregarNota();
+            }
+        });
+
+        // Inicializar notas
+        renderizarNotas();
+    </script>
+</body>
 </html>
