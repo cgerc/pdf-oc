@@ -8,23 +8,22 @@
         body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f4; }
         .control-panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 400px; float: left; margin-right: 20px; }
         .page { background: white; padding: 20px; border: 1px solid #ddd; max-width: 800px; margin-top: 20px; box-sizing: border-box; }
-       @media print {
-      .no-print {
-        display: none;
-      }
-      .page {
-        margin: 0;
-        border: none;
-        box-shadow: none;
-        padding: 0;
-      }
-    }
+
+        @media print {
+            .no-print { display: none; }
+            .page {
+                margin: 0;
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                page-break-after: always; /* Solo aquí para impresión normal */
+            }
+        }
 
         /* EVITA QUE EL PDF SE CORTE */
         table, tr, .totals-section, .footer-notes, .notes, .signatures, .info-grid, .oc-box {
             page-break-inside: avoid !important;
         }
-        .page { page-break-after: always; }
 
         /* Nueva sección para OCs guardadas */
         .ocs-section { margin-top: 30px; background: #f9f9f9; padding: 15px; border-radius: 6px; }
@@ -60,12 +59,10 @@
             <button onclick="agregarItem()">+ Agregar</button>
         </div>
 
-        <!-- Nueva sección para editar número de OC -->
         <h3>Configuración de Número de OC</h3>
         <input type="number" id="editOcNumber" placeholder="Editar número actual de OC" style="width: 70%;">
         <button onclick="actualizarNumeroManual()" style="width: 28%;">Actualizar</button>
 
-        <!-- Nueva sección para OCs guardadas -->
         <div class="ocs-section">
             <h3>Órdenes de Compra Guardadas</h3>
             <div id="ocsList" class="ocs-list"></div>
@@ -164,7 +161,7 @@
 
         // === NÚMERO DE OC INCREMENTAL ===
         const KEY_OC = 'ultimaOC_HHS';
-        const KEY_OCS = 'ocs_HHS'; // Nueva clave para almacenar OCs
+        const KEY_OCS = 'ocs_HHS';
         let numeroActual = parseInt(localStorage.getItem(KEY_OC) || '1');
         let ocsGuardadas = JSON.parse(localStorage.getItem(KEY_OCS)) || [];
 
@@ -174,7 +171,6 @@
             document.getElementById('proximaOC').textContent = String(numeroActual + 1).padStart(4, '0');
         }
 
-        // Nueva función para actualizar número manualmente
         function actualizarNumeroManual() {
             const nuevoNumero = parseInt(document.getElementById('editOcNumber').value);
             if (isNaN(nuevoNumero) || nuevoNumero < 1) {
@@ -188,7 +184,6 @@
             alert('Número de OC actualizado correctamente.');
         }
 
-        // Nueva función para guardar la OC actual
         function guardarOC() {
             const ocData = {
                 numero: document.getElementById('ocNum').textContent,
@@ -198,8 +193,8 @@
                 rut: document.getElementById('dispRut').textContent,
                 direccion: document.getElementById('dispDir').textContent,
                 condicionPago: document.getElementById('dispCondicionPago').textContent,
-                items: [...items], // Copia de los items
-                notas: [...notasExtra], // Copia de las notas
+                items: [...items],
+                notas: [...notasExtra],
                 totalNeto: document.getElementById('totalNeto').textContent,
                 totalIva: document.getElementById('totalIva').textContent,
                 totalFinal: document.getElementById('totalFinal').textContent
@@ -209,7 +204,6 @@
             renderizarOCsGuardadas();
         }
 
-        // Nueva función para renderizar lista de OCs guardadas
         function renderizarOCsGuardadas() {
             const listContainer = document.getElementById('ocsList');
             listContainer.innerHTML = '';
@@ -231,15 +225,12 @@
             });
         }
 
-        // Nueva función para cargar una OC guardada (para edición)
         function cargarOC(index) {
             if (!confirm('¿Cargar esta OC? Se sobrescribirán los datos actuales.')) return;
             const oc = ocsGuardadas[index];
 
-            // Cargar datos básicos
             document.getElementById('inputObraSelect').value = oc.obra;
             document.getElementById('dispObra').textContent = oc.obra;
-            document.getElementById('inputProveedor').value = ''; // Necesita mapear de vuelta, pero como proveedor es por clase, asumir búsqueda
             document.getElementById('dispProv').textContent = oc.proveedor;
             document.getElementById('inputRutProv').value = oc.rut;
             document.getElementById('dispRut').textContent = oc.rut;
@@ -248,22 +239,15 @@
             document.getElementById('inputCondicionPago').value = oc.condicionPago;
             document.getElementById('dispCondicionPago').textContent = oc.condicionPago;
 
-            // Cargar fecha (asumir actual, o setear si guardada)
-            // Nota: fecha es readonly, pero para edición, quizás permitir cambio
-
-            // Cargar items
             items = [...oc.items];
             renderizarTabla();
 
-            // Cargar notas
             notasExtra = [...oc.notas];
             renderizarNotas();
 
-            // Opcional: No cambiar número de OC, ya que es para editar una nueva basada en esta
             alert('OC cargada para edición. Puedes modificar y generar una nueva.');
         }
 
-        // Nueva función para borrar OC guardada
         function borrarOC(index) {
             if (!confirm('¿Borrar esta OC guardada?')) return;
             ocsGuardadas.splice(index, 1);
@@ -272,42 +256,48 @@
         }
 
         function generarPDF() {
-      const obra = document.getElementById('dispObra').textContent.trim() || 'Sin Obra';
-      const numeroOC = document.getElementById('ocNum').textContent;
-      const nombreArchivo = `${obra} , OC N°${numeroOC}.pdf`;
-      const element = document.querySelector('.page');
-      const borderOriginal = element.style.border;
-      const shadowOriginal = element.style.boxShadow;
-      element.style.border = 'none';
-      element.style.boxShadow = 'none';
-      const opt = {
-        // 1. Márgenes pequeños para aprovechar la hoja (0.2 pulgadas)
-        margin: 0.2,
-        filename: nombreArchivo,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 2, // Usamos 2 para mejor calidad de texto
-          useCORS: true,
-          letterRendering: true,
-          scrollY: 0 // Asegura que se imprima desde arriba aunque hayas hecho scroll
-        },
-        jsPDF: {
-          unit: 'in',
-          format: 'letter', // USAMOS TAMAÑO CARTA ESTÁNDAR
-          orientation: 'portrait'
-        },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-      };
-      // Generar el PDF
-      html2pdf().set(opt).from(element).save().then(() => {
-        // Solo incrementamos el número si se guardó con éxito
-        numeroActual++;
-        localStorage.setItem(KEY_OC, numeroActual);
-        actualizarNumeroOC();
-      });
-    }
+            const obra = document.getElementById('dispObra').textContent.trim() || 'Sin Obra';
+            const numeroOC = document.getElementById('ocNum').textContent;
+            const nombreArchivo = `${obra} , OC N°${numeroOC}.pdf`;
+            const element = document.querySelector('.page');
 
-        // Inicializar número y OCs
+            // Quitar bordes y sombra temporalmente
+            const borderOriginal = element.style.border;
+            const shadowOriginal = element.style.boxShadow;
+            element.style.border = 'none';
+            element.style.boxShadow = 'none';
+
+            const opt = {
+                margin: [0.3, 0.2, 0.5, 0.2], // top, right, bottom, left → más margen abajo
+                filename: nombreArchivo,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    letterRendering: true,
+                    scrollY: 0
+                },
+                jsPDF: {
+                    unit: 'in',
+                    format: 'letter',
+                    orientation: 'portrait'
+                },
+                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+            };
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                // Restaurar estilos
+                element.style.border = borderOriginal;
+                element.style.boxShadow = shadowOriginal;
+
+                // Incrementar número de OC
+                numeroActual++;
+                localStorage.setItem(KEY_OC, numeroActual);
+                actualizarNumeroOC();
+            });
+        }
+
+        // Inicializar
         actualizarNumeroOC();
         renderizarOCsGuardadas();
 
@@ -315,21 +305,19 @@
             document.getElementById('inputFecha').valueAsDate = new Date();
             document.getElementById('dispFecha').innerText = new Date().toLocaleDateString('es-CL');
 
-            // CARGAR PROVEEDORES - VERSIÓN QUE SÍ FUNCIONA CON TUS 38 FILAS
+            // === CARGAR PROVEEDORES ===
             fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vSQ0W7Yhu123yENGAHaV5Ok-yX5DkPO_7orj9rydaVbI_f4DDQN41MPc7nuGSIkaO_-vBeRnM2rF9SR/pub?output=csv')
                 .then(response => response.text())
                 .then(csv => {
                     const rows = csv.split('\n').map(row => row.trim()).filter(row => row);
                     const data = {};
 
-                    // Saltamos la cabecera
                     for (let i = 1; i < rows.length; i++) {
                         let row = rows[i];
                         let fields = [];
                         let field = '';
                         let inQuotes = false;
 
-                        // Parseo manual carácter por carácter
                         for (let char of row + ',') {
                             if (char === '"') {
                                 inQuotes = !inQuotes;
@@ -341,7 +329,6 @@
                             }
                         }
 
-                        // Limpiar comillas
                         fields = fields.map(f => f.replace(/^"|"$/g, '').trim());
 
                         const clase = fields[0] || '';
@@ -355,9 +342,6 @@
                         }
                     }
 
-                    console.log('Proveedores cargados:', Object.keys(data).length); // <-- Esto te dirá cuántas cargó
-
-                    // Dropdown Razón Social
                     const selProv = document.getElementById('inputProveedor');
                     selProv.innerHTML = '<option value="">Selecciona Razón Social...</option>';
                     Object.keys(data).sort().forEach(clase => {
@@ -367,7 +351,6 @@
                         selProv.appendChild(opt);
                     });
 
-                    // Dropdown Clase para ítems
                     const selClase = document.getElementById('newClase');
                     selClase.innerHTML = '<option value="">Clase</option>';
                     Object.keys(data).sort().forEach(clase => {
@@ -377,7 +360,6 @@
                         selClase.appendChild(opt);
                     });
 
-                    // Cuando cambias proveedor
                     selProv.onchange = () => {
                         const p = data[selProv.value];
                         if (!p) return;
@@ -402,7 +384,7 @@
                     alert('No se pudieron cargar los proveedores');
                 });
 
-            // CARGAR OBRAS
+            // === CARGAR OBRAS ===
             fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vSQ0W7Yhu123yENGAHaV5Ok-yX5DkPO_7orj9rydaVbI_f4DDQN41MPc7nuGSIkaO_-vBeRnM2rF9SR/pub?gid=1397970288&single=true&output=csv')
                 .then(r => r.text())
                 .then(csv => {
@@ -461,7 +443,7 @@
             document.getElementById('totalFinal').textContent = formatearMoneda(neto + iva);
         }
 
-        // === NOTAS AL PROVEEDOR - EDITABLES ===
+        // === NOTAS ===
         let notasExtra = [];
 
         function renderizarNotas() {
@@ -525,7 +507,6 @@
             }
         });
 
-        // Inicializar notas
         renderizarNotas();
     </script>
 </body>
