@@ -16,16 +16,14 @@
                 border: none;
                 box-shadow: none;
                 padding: 0;
-                page-break-after: always; /* Solo aquí para impresión normal */
+                page-break-after: always;
             }
         }
 
-        /* EVITA QUE EL PDF SE CORTE */
         table, tr, .totals-section, .footer-notes, .notes, .signatures, .info-grid, .oc-box {
             page-break-inside: avoid !important;
         }
 
-        /* Nueva sección para OCs guardadas */
         .ocs-section { margin-top: 30px; background: #f9f9f9; padding: 15px; border-radius: 6px; }
         .ocs-list { max-height: 200px; overflow-y: auto; }
         .oc-item { padding: 8px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
@@ -145,7 +143,6 @@
                     <br><br><br>
                     <hr style="border-top:1px solid #000;">
                     <p style="margin:5px 0;"><strong>Carmen Ger</strong></p>
-                    
                 </div>
             </div>
         </footer>
@@ -260,36 +257,24 @@
             const nombreArchivo = `${obra} , OC N°${numeroOC}.pdf`;
             const element = document.querySelector('.page');
 
-            // Quitar bordes y sombra temporalmente
             const borderOriginal = element.style.border;
             const shadowOriginal = element.style.boxShadow;
             element.style.border = 'none';
             element.style.boxShadow = 'none';
 
             const opt = {
-                margin: [0.3, 0.2, 0.5, 0.2], // top, right, bottom, left → más margen abajo
+                margin: [0.3, 0.2, 0.5, 0.2],
                 filename: nombreArchivo,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: {
-                    scale: 2,
-                    useCORS: true,
-                    letterRendering: true,
-                    scrollY: 0
-                },
-                jsPDF: {
-                    unit: 'in',
-                    format: 'letter',
-                    orientation: 'portrait'
-                },
+                html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollY: 0 },
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
                 pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
             };
 
             html2pdf().set(opt).from(element).save().then(() => {
-                // Restaurar estilos
                 element.style.border = borderOriginal;
                 element.style.boxShadow = shadowOriginal;
 
-                // Incrementar número de OC
                 numeroActual++;
                 localStorage.setItem(KEY_OC, numeroActual);
                 actualizarNumeroOC();
@@ -304,7 +289,7 @@
             document.getElementById('inputFecha').valueAsDate = new Date();
             document.getElementById('dispFecha').innerText = new Date().toLocaleDateString('es-CL');
 
-            // === CARGAR PROVEEDORES ===
+            // CARGAR PROVEEDORES (sin cambios, asumiendo que ya lo mejoraste con PapaParse si era necesario)
             fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vSQ0W7Yhu123yENGAHaV5Ok-yX5DkPO_7orj9rydaVbI_f4DDQN41MPc7nuGSIkaO_-vBeRnM2rF9SR/pub?output=csv')
                 .then(response => response.text())
                 .then(csv => {
@@ -318,9 +303,8 @@
                         let inQuotes = false;
 
                         for (let char of row + ',') {
-                            if (char === '"') {
-                                inQuotes = !inQuotes;
-                            } else if (char === ',' && !inQuotes) {
+                            if (char === '"') inQuotes = !inQuotes;
+                            else if (char === ',' && !inQuotes) {
                                 fields.push(field.trim());
                                 field = '';
                             } else {
@@ -383,7 +367,7 @@
                     alert('No se pudieron cargar los proveedores');
                 });
 
-            // === CARGAR OBRAS ===
+            // CARGAR OBRAS (sin cambios)
             fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vSQ0W7Yhu123yENGAHaV5Ok-yX5DkPO_7orj9rydaVbI_f4DDQN41MPc7nuGSIkaO_-vBeRnM2rF9SR/pub?gid=1397970288&single=true&output=csv')
                 .then(r => r.text())
                 .then(csv => {
@@ -414,7 +398,8 @@
             const cant = parseFloat(document.getElementById('newQty').value) || 0;
             const precio = parseFloat(document.getElementById('newPrice').value) || 0;
             if (!clase || !desc) return alert("Faltan clase o descripción");
-            items.push({ clase, desc, cant, precio, total: cant * precio });
+            const totalItem = cant * precio;
+            items.push({ clase, desc, cant, precio, total: totalItem });
             renderizarTabla();
             document.getElementById('newDesc').value = "";
             document.getElementById('newQty').value = "";
@@ -425,8 +410,9 @@
             const tbody = document.getElementById('tablaCuerpo');
             tbody.innerHTML = "";
             let neto = 0;
+
             items.forEach(i => {
-                neto += i.total;
+                neto += i.total;  // acumula en flotante, pero debería ser entero si cant y precio son razonables
                 tbody.innerHTML += `<tr>
                     <td style="padding:8px; border-bottom:1px solid #ddd;">${i.clase}</td>
                     <td style="padding:8px; border-bottom:1px solid #ddd;">${i.desc}</td>
@@ -436,10 +422,14 @@
                     <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">${formatearMoneda(i.total)}</td>
                 </tr>`;
             });
-            const iva = neto * 0.19;
-            document.getElementById('totalNeto').textContent = formatearMoneda(neto);
+
+            // Cálculo corregido del IVA: redondeo hacia arriba para coincidir con prácticas comunes en Chile
+            const ivaExacto = neto * 0.19;
+            const iva = Math.ceil(ivaExacto);  // ← Esto soluciona la diferencia de $1
+
+            document.getElementById('totalNeto').textContent = formatearMoneda(Math.round(neto)); // redondeo neto por seguridad
             document.getElementById('totalIva').textContent = formatearMoneda(iva);
-            document.getElementById('totalFinal').textContent = formatearMoneda(neto + iva);
+            document.getElementById('totalFinal').textContent = formatearMoneda(Math.round(neto) + iva);
         }
 
         // === NOTAS ===
