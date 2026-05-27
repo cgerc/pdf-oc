@@ -88,7 +88,7 @@
     </div>
     <div class="oc-box" style="text-align:right; margin-top:20px;">
         <h2>ORDEN DE COMPRA</h2>
-        <div class="oc-number">N° <span id="ocNum" style="font-size:24px; font-weight:bold;">000</span></div>
+        <div class="oc-number">N° <span id="ocNum" style="font-size:24px; font-weight:bold;">0000</span></div>
         <p>Fecha: <span id="dispFecha"></span></p>
     </div>
 </header>
@@ -155,13 +155,16 @@
             return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(n);
         }
 
-        // === NÚMERO DE OC INCREMENTAL ===
+        // === NÚMERO DE OC INCREMENTAL E ILIMITADO ===
         const KEY_OC = 'ultimaOC_HHS';
         const KEY_OCS = 'ocs_HHS';
-        let numeroActual = parseInt(localStorage.getItem(KEY_OC) || '1');
+        
+        // CORRECCIÓN: Si el navegador no tiene ningún registro previo, arranca directamente en 97
+        let numeroActual = parseInt(localStorage.getItem(KEY_OC) || '97');
         let ocsGuardadas = JSON.parse(localStorage.getItem(KEY_OCS)) || [];
 
         function actualizarNumeroOC() {
+            // Rellena con ceros hasta 4 dígitos (ej: 0097). Si pasa de 9999, continúa creciendo de forma ilimitada
             const padded = String(numeroActual).padStart(4, '0');
             document.getElementById('ocNum').textContent = padded;
             document.getElementById('proximaOC').textContent = String(numeroActual + 1).padStart(4, '0');
@@ -241,6 +244,9 @@
             notasExtra = [...oc.notas];
             renderizarNotas();
 
+            numeroActual = parseInt(oc.numero);
+            actualizarNumeroOC();
+
             alert('OC cargada para edición. Puedes modificar y generar una nueva.');
         }
 
@@ -271,10 +277,13 @@
                 pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
             };
 
+            guardarOC();
+
             html2pdf().set(opt).from(element).save().then(() => {
                 element.style.border = borderOriginal;
                 element.style.boxShadow = shadowOriginal;
 
+                // Incremento sin límites en la base de datos local
                 numeroActual++;
                 localStorage.setItem(KEY_OC, numeroActual);
                 actualizarNumeroOC();
@@ -289,7 +298,7 @@
             document.getElementById('inputFecha').valueAsDate = new Date();
             document.getElementById('dispFecha').innerText = new Date().toLocaleDateString('es-CL');
 
-            // CARGAR PROVEEDORES (sin cambios, asumiendo que ya lo mejoraste con PapaParse si era necesario)
+            // CARGAR PROVEEDORES
             fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vSQ0W7Yhu123yENGAHaV5Ok-yX5DkPO_7orj9rydaVbI_f4DDQN41MPc7nuGSIkaO_-vBeRnM2rF9SR/pub?output=csv')
                 .then(response => response.text())
                 .then(csv => {
@@ -367,7 +376,7 @@
                     alert('No se pudieron cargar los proveedores');
                 });
 
-            // CARGAR OBRAS (sin cambios)
+            // CARGAR OBRAS
             fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vSQ0W7Yhu123yENGAHaV5Ok-yX5DkPO_7orj9rydaVbI_f4DDQN41MPc7nuGSIkaO_-vBeRnM2rF9SR/pub?gid=1397970288&single=true&output=csv')
                 .then(r => r.text())
                 .then(csv => {
@@ -412,7 +421,7 @@
             let neto = 0;
 
             items.forEach(i => {
-                neto += i.total;  // acumula en flotante, pero debería ser entero si cant y precio son razonables
+                neto += i.total;
                 tbody.innerHTML += `<tr>
                     <td style="padding:8px; border-bottom:1px solid #ddd;">${i.clase}</td>
                     <td style="padding:8px; border-bottom:1px solid #ddd;">${i.desc}</td>
@@ -423,11 +432,10 @@
                 </tr>`;
             });
 
-            // Cálculo corregido del IVA: redondeo hacia arriba para coincidir con prácticas comunes en Chile
             const ivaExacto = neto * 0.19;
-            const iva = Math.ceil(ivaExacto);  // ← Esto soluciona la diferencia de $1
+            const iva = Math.ceil(ivaExacto);
 
-            document.getElementById('totalNeto').textContent = formatearMoneda(Math.round(neto)); // redondeo neto por seguridad
+            document.getElementById('totalNeto').textContent = formatearMoneda(Math.round(neto));
             document.getElementById('totalIva').textContent = formatearMoneda(iva);
             document.getElementById('totalFinal').textContent = formatearMoneda(Math.round(neto) + iva);
         }
