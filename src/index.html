@@ -40,6 +40,12 @@
         <input type="text" id="inputDireccion" placeholder="Dirección" readonly style="background:#f9f9f9;">
         <input type="date" id="inputFecha" readonly>
         <select id="inputCondicionPago"><option value="">Seleccione proveedor primero</option></select>
+        
+        <label style="display:block; margin-top:10px; font-weight:bold; font-size:14px;">Tipo de Documento:</label>
+        <select id="inputTipoImpuesto" onchange="cambiarTipoImpuesto()">
+            <option value="IVA">Factura (IVA 19%)</option>
+            <option value="HONORARIOS">Boleta de Honorarios (Retención 13.75%)</option>
+        </select>
 
         <h3>Notas al Proveedor</h3>
         <div style="margin-top: 10px;">
@@ -75,23 +81,23 @@
     </div>
 
     <div class="page">
-       <header>
-    <div class="logo-section" style="display:flex; align-items:center; justify-content:space-between;">
-        <img src="logo-hh.jpg" alt="Hard Hat Logo" style="width: 100px;">
-        <div class="company-info" style="text-align:right; font-size:11px; line-height:1.3;">
-            <strong style="font-size:14px;">HARD HAT SOLUTIONS SPA</strong><br>
-            Giro: ESTUDIO, GESTIÓN, ADMINISTRACIÓN DE OBRAS DE CONSTRUCCIÓN<br>
-            RUT: 78.293.581-K<br>
-            Dr. Manuel Barros Borgoño 71, Of 1105, Providencia<br>
-            Contacto: administracion@hhs.cl | +56 9 6254 3173
-        </div>
-    </div>
-    <div class="oc-box" style="text-align:right; margin-top:20px;">
-        <h2>ORDEN DE COMPRA</h2>
-        <div class="oc-number">N° <span id="ocNum" style="font-size:24px; font-weight:bold;">0000</span></div>
-        <p>Fecha: <span id="dispFecha"></span></p>
-    </div>
-</header>
+        <header>
+            <div class="logo-section" style="display:flex; align-items:center; justify-content:space-between;">
+                <img src="logo-hh.jpg" alt="Hard Hat Logo" style="width: 100px;">
+                <div class="company-info" style="text-align:right; font-size:11px; line-height:1.3;">
+                    <strong style="font-size:14px;">HARD HAT SOLUTIONS SPA</strong><br>
+                    Giro: ESTUDIO, GESTIÓN, ADMINISTRACIÓN DE OBRAS DE CONSTRUCCIÓN<br>
+                    RUT: 78.293.581-K<br>
+                    Dr. Manuel Barros Borgoño 71, Of 1105, Providencia<br>
+                    Contacto: administracion@hhs.cl | +56 9 6254 3173
+                </div>
+            </div>
+            <div class="oc-box" style="text-align:right; margin-top:20px;">
+                <h2>ORDEN DE COMPRA</h2>
+                <div class="oc-number">N° <span id="ocNum" style="font-size:24px; font-weight:bold;">0000</span></div>
+                <p>Fecha: <span id="dispFecha"></span></p>
+            </div>
+        </header>
         <section class="info-grid" style="display:flex; justify-content:space-between; margin:30px 0; font-size:15px;">
             <div class="box">
                 <strong>Señor(es):</strong> <span id="dispProv"></span><br>
@@ -121,8 +127,8 @@
 
         <div class="totals-section" style="text-align:right; margin:30px 0;">
             <div style="display:inline-block; background:#f8f8f8; padding:15px; border-radius:8px;">
-                <div style="margin:8px 0;"><span>Neto:</span> <strong><span id="totalNeto">$0</span></strong></div>
-                <div style="margin:8px 0;"><span>IVA (19%):</span> <strong><span id="totalIva">$0</span></strong></div>
+                <div style="margin:8px 0;"><span id="labelNeto">Neto:</span> <strong><span id="totalNeto">$0</span></strong></div>
+                <div style="margin:8px 0;"><span id="labelImpuesto">IVA (19%):</span> <strong><span id="totalIva">$0</span></strong></div>
                 <div style="margin:12px 0; font-size:18px; border-top:2px solid #000; padding-top:8px;">
                     <span>TOTAL:</span> <strong><span id="totalFinal">$0</span></strong>
                 </div>
@@ -159,12 +165,13 @@
         const KEY_OC = 'ultimaOC_HHS';
         const KEY_OCS = 'ocs_HHS';
         
-        // CORRECCIÓN: Si el navegador no tiene ningún registro previo, arranca directamente en 97
         let numeroActual = parseInt(localStorage.getItem(KEY_OC) || '97');
         let ocsGuardadas = JSON.parse(localStorage.getItem(KEY_OCS)) || [];
+        
+        // NUEVO: Estado del tipo de impuesto ("IVA" o "HONORARIOS")
+        let tipoImpuestoActual = "IVA"; 
 
         function actualizarNumeroOC() {
-            // Rellena con ceros hasta 4 dígitos (ej: 0097). Si pasa de 9999, continúa creciendo de forma ilimitada
             const padded = String(numeroActual).padStart(4, '0');
             document.getElementById('ocNum').textContent = padded;
             document.getElementById('proximaOC').textContent = String(numeroActual + 1).padStart(4, '0');
@@ -183,6 +190,12 @@
             alert('Número de OC actualizado correctamente.');
         }
 
+        // NUEVA FUNCIÓN: Al cambiar el select, re-calcula y actualiza la tabla
+        function cambiarTipoImpuesto() {
+            tipoImpuestoActual = document.getElementById('inputTipoImpuesto').value;
+            renderizarTabla();
+        }
+
         function guardarOC() {
             const ocData = {
                 numero: document.getElementById('ocNum').textContent,
@@ -194,6 +207,8 @@
                 condicionPago: document.getElementById('dispCondicionPago').textContent,
                 items: [...items],
                 notas: [...notasExtra],
+                tipoImpuesto: tipoImpuestoActual, // NUEVO: Guardar el tipo de cálculo
+                labelImpuesto: document.getElementById('labelImpuesto').textContent, // NUEVO
                 totalNeto: document.getElementById('totalNeto').textContent,
                 totalIva: document.getElementById('totalIva').textContent,
                 totalFinal: document.getElementById('totalFinal').textContent
@@ -237,6 +252,10 @@
             document.getElementById('dispDir').textContent = oc.direccion;
             document.getElementById('inputCondicionPago').value = oc.condicionPago;
             document.getElementById('dispCondicionPago').textContent = oc.condicionPago;
+
+            // MODIFICADO: Recuperar el estado del impuesto guardado
+            tipoImpuestoActual = oc.tipoImpuesto || "IVA";
+            document.getElementById('inputTipoImpuesto').value = tipoImpuestoActual;
 
             items = [...oc.items];
             renderizarTabla();
@@ -283,7 +302,6 @@
                 element.style.border = borderOriginal;
                 element.style.boxShadow = shadowOriginal;
 
-                // Incremento sin límites en la base de datos local
                 numeroActual++;
                 localStorage.setItem(KEY_OC, numeroActual);
                 actualizarNumeroOC();
@@ -415,6 +433,7 @@
             document.getElementById('newPrice').value = "";
         }
 
+        // MODIFICADO: Lógica de cálculo dinámico para IVA u Honorarios
         function renderizarTabla() {
             const tbody = document.getElementById('tablaCuerpo');
             tbody.innerHTML = "";
@@ -432,15 +451,34 @@
                 </tr>`;
             });
 
-            const ivaExacto = neto * 0.19;
-            const iva = Math.ceil(ivaExacto);
-
-            document.getElementById('totalNeto').textContent = formatearMoneda(Math.round(neto));
-            document.getElementById('totalIva').textContent = formatearMoneda(iva);
-            document.getElementById('totalFinal').textContent = formatearMoneda(Math.round(neto) + iva);
+            let impuestoExacto = 0;
+            
+            if (tipoImpuestoActual === "IVA") {
+                // Configuración clásica de Factura
+                document.getElementById('labelNeto').textContent = "Neto:";
+                document.getElementById('labelImpuesto').textContent = "IVA (19%):";
+                impuestoExacto = neto * 0.19;
+                
+                const impuesto = Math.ceil(impuestoExacto);
+                document.getElementById('totalNeto').textContent = formatearMoneda(Math.round(neto));
+                document.getElementById('totalIva').textContent = formatearMoneda(impuesto);
+                document.getElementById('totalFinal').textContent = formatearMoneda(Math.round(neto) + impuesto);
+            } else {
+                // Configuración de Boleta de Honorarios (Tasa del 13.75% para 2026)
+                document.getElementById('labelNeto').textContent = "Bruto:";
+                document.getElementById('labelImpuesto').textContent = "Retención (13.75%):";
+                impuestoExacto = neto * 0.1375;
+                
+                const impuesto = Math.ceil(impuestoExacto);
+                document.getElementById('totalNeto').textContent = formatearMoneda(Math.round(neto));
+                document.getElementById('totalIva').textContent = formatearMoneda(impuesto);
+                // El total líquido a pagar en honorarios es Bruto menos la Retención
+                document.getElementById('totalFinal').textContent = formatearMoneda(Math.round(neto) - impuesto);
+            }
         }
 
         // === NOTAS ===
+        let notesExtra = []; // Corrección interna de variable para consistencia
         let notasExtra = [];
 
         function renderizarNotas() {
@@ -486,7 +524,7 @@
                 borrarNota(index);
             } else {
                 notasExtra[index] = "• " + nuevoTexto.trim();
-                renderizarNotas();
+                renderizarNotes();
             }
         }
 
